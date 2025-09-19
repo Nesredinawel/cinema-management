@@ -13,11 +13,11 @@ import (
 // ---------------- Add Movie ----------------
 func AddMovie(c *gin.Context) {
 	var movie models.Movie
+	var genreIDs []int
 
 	// Get form values
 	movie.Title = c.PostForm("title")
 	movie.Description = c.PostForm("description")
-	movie.Genre = c.PostForm("genre")
 
 	// Convert numeric fields safely
 	if durStr := c.PostForm("duration"); durStr != "" {
@@ -33,6 +33,15 @@ func AddMovie(c *gin.Context) {
 	if ratingStr := c.PostForm("rating"); ratingStr != "" {
 		if r, err := strconv.ParseFloat(ratingStr, 64); err == nil {
 			movie.Rating = &r
+		}
+	}
+
+	// Parse genre_ids (comma-separated in form-data)
+	if genreStr := c.PostForm("genre_ids"); genreStr != "" {
+		for _, g := range strings.Split(genreStr, ",") {
+			if gid, err := strconv.Atoi(strings.TrimSpace(g)); err == nil {
+				genreIDs = append(genreIDs, gid)
+			}
 		}
 	}
 
@@ -58,8 +67,8 @@ func AddMovie(c *gin.Context) {
 		}
 	}
 
-	// Create movie
-	if err := models.CreateMovie(&movie); err != nil {
+	// Create movie with genres
+	if err := models.CreateMovie(&movie, genreIDs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create movie"})
 		return
 	}
@@ -127,7 +136,7 @@ func UpdateMovie(c *gin.Context) {
 		return
 	}
 
-	// Fetch existing movie from DB
+	// Fetch existing movie
 	existingMovie, err := models.GetMovieByID(movieID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch movie"})
@@ -138,44 +147,47 @@ func UpdateMovie(c *gin.Context) {
 		return
 	}
 
-	// Bind incoming JSON into a map
-	var req map[string]interface{}
+	// Parse incoming JSON
+	var req struct {
+		Title          *string  `json:"title"`
+		Description    *string  `json:"description"`
+		Duration       *int     `json:"duration"`
+		ReleaseYear    *int     `json:"release_year"`
+		Rating         *float64 `json:"rating"`
+		ImagePosterURL *string  `json:"image_poster_url"`
+		GenreIDs       []int    `json:"genre_ids"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Update only fields provided
-	if title, ok := req["title"].(string); ok {
-		existingMovie.Title = title
+	// Apply updates
+	if req.Title != nil {
+		existingMovie.Title = *req.Title
 	}
-	if description, ok := req["description"].(string); ok {
-		existingMovie.Description = description
+	if req.Description != nil {
+		existingMovie.Description = *req.Description
 	}
-	if genre, ok := req["genre"].(string); ok {
-		existingMovie.Genre = genre
+	if req.Duration != nil {
+		existingMovie.Duration = *req.Duration
 	}
-	if dur, ok := req["duration"].(float64); ok { // JSON numbers are float64
-		existingMovie.Duration = int(dur)
+	if req.ReleaseYear != nil {
+		existingMovie.ReleaseYear = *req.ReleaseYear
 	}
-	if year, ok := req["release_year"].(float64); ok {
-		existingMovie.ReleaseYear = int(year)
+	if req.Rating != nil {
+		existingMovie.Rating = req.Rating
 	}
-	if rating, ok := req["rating"].(float64); ok {
-		existingMovie.Rating = &rating
-	}
-	if poster, ok := req["image_poster_url"].(string); ok {
-		existingMovie.ImagePosterURL = &poster
-
-		// convert to public URL if needed
-		if !strings.HasPrefix(poster, "http://") && !strings.HasPrefix(poster, "https://") {
-			publicURL := utils.ConvertPosterToPublicURL(existingMovie.ImagePosterURL, "http://localhost:8082/")
+	if req.ImagePosterURL != nil {
+		existingMovie.ImagePosterURL = req.ImagePosterURL
+		if !strings.HasPrefix(*req.ImagePosterURL, "http://") && !strings.HasPrefix(*req.ImagePosterURL, "https://") {
+			publicURL := utils.ConvertPosterToPublicURL(req.ImagePosterURL, "http://localhost:8082/")
 			existingMovie.ImagePosterURL = &publicURL
 		}
 	}
 
-	// Save updated movie
-	if err := models.UpdateMovie(existingMovie); err != nil {
+	// Save update with genres
+	if err := models.UpdateMovie(existingMovie, req.GenreIDs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update movie"})
 		return
 	}

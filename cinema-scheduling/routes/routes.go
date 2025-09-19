@@ -19,6 +19,13 @@ func SetupRoutes(router *gin.Engine) {
 		adminGroup.PUT("/movies/:movie_id", controllers.UpdateMovie)    // update movie
 		adminGroup.DELETE("/movies/:movie_id", controllers.DeleteMovie) // delete movie
 
+		// ---------------- Genres ----------------
+		adminGroup.POST("/genres", controllers.AddGenre)
+		adminGroup.GET("/genres", controllers.ListGenres)
+		adminGroup.GET("/genres/:genre_id", controllers.GetGenre)
+		adminGroup.PUT("/genres/:genre_id", controllers.UpdateGenre)    // update genre
+		adminGroup.DELETE("/genres/:genre_id", controllers.DeleteGenre) // delete genre
+
 		// ---------------- Schedules ----------------
 		adminGroup.POST("/schedules", controllers.AddSchedule)
 		adminGroup.GET("/schedules", controllers.ListSchedules)
