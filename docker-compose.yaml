@@ -1,0 +1,76 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: auth_postgres
+    environment:
+      POSTGRES_USER: cinema_user
+      POSTGRES_PASSWORD: cinema_pass
+      POSTGRES_DB: cinema_auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:7
+    container_name: auth_redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  hasura:
+    image: hasura/graphql-engine:v2.3.0
+    container_name: auth_hasura
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://cinema_user:cinema_pass@postgres:5432/cinema_auth
+      HASURA_GRAPHQL_ADMIN_SECRET: myadminsecretkey
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+    restart: always
+
+  auth-backend:
+    build: ./auth-backend
+    container_name: cinema_auth_backend
+    depends_on:
+      - postgres
+      - redis
+      - hasura
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: 8081
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: cinema_user
+      DB_PASSWORD: cinema_pass
+      DB_NAME: cinema_auth
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: supersecretjwtkey
+    restart: always
+
+  cinema-scheduling:
+    build: ./cinema-scheduling
+    container_name: cinema_scheduling_service
+    depends_on:
+      - auth-backend
+    ports:
+      - "8082:8082"
+    environment:
+      PORT: 8082
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: cinema_user
+      DB_PASSWORD: cinema_pass
+      DB_NAME: cinema_auth
+      JWT_SECRET: supersecretjwtkey   # same secret as auth-backend
+    restart: always
+
+volumes:
+  auth_postgres_data:
