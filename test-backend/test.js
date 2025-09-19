@@ -4,17 +4,17 @@ const fs = require("fs");
 const path = require("path");
 
 const API_BASE = "http://localhost:8082/api/admin";
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTgzMDQwNzUsInJvbGUiOiJhZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJ1c2VyX2lkIjoyfQ.9NmAMCYFPBL3dvFpLaODPfan8CD5I4a4Ty8q7wMdcrs"; // Replace with your JWT
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTgzMjMzNzUsInJvbGUiOiJhZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJ1c2VyX2lkIjoyfQ.CWva3TpF84x6A1LojvzQrG1copslBigZFe4ZJW8fERA"; // Replace with your JWT
 
 async function main() {
   try {
     // ---------------- MOVIES ----------------
     
     const movieForm = new FormData();
-    movieForm.append("title", "battman");
-    movieForm.append("description", "A mind-bending thriller");
+    movieForm.append("title", "american pie");
+    movieForm.append("description", "A mind-bending thriller about dreams within dreams.");
     movieForm.append("duration", 148);
-    movieForm.append("genre", "Sci-Fi, Thriller, Action");
+    movieForm.append("genre", "Sci-Fi,Thriller");
     movieForm.append("release_year", 2010);
     movieForm.append("rating", 8.8);
     movieForm.append("image_poster_url", fs.createReadStream(path.join("C:/Users/nesre/Downloads", "inception.jpg")));
@@ -38,12 +38,12 @@ async function main() {
 
     // ---------------- SNACKS ----------------
     
-    const snackForm = new FormData();
-    snackForm.append("name", "hotdog");
-    snackForm.append("price", 5.5);
-    snackForm.append("description", "A delicious hotdog with mustard and ketchup");
-    snackForm.append("category", "Food");
-    snackForm.append("snack_image_url", fs.createReadStream(path.join("C:/Users/nesre/Downloads", "popcorn.jpg")));
+    // const snackForm = new FormData();
+    // snackForm.append("name", "hotdog");
+    // snackForm.append("price", 5.5);
+    // snackForm.append("description", "A delicious hotdog with mustard and ketchup");
+    // snackForm.append("category", "Food");
+    // snackForm.append("snack_image_url", fs.createReadStream(path.join("C:/Users/nesre/Downloads", "popcorn.jpg")));
 
     // const snackRes = await axios.post(`${API_BASE}/snacks`, snackForm, {
     //   headers: { Authorization: `Bearer ${TOKEN}`, ...snackForm.getHeaders() },
@@ -64,7 +64,7 @@ async function main() {
 
     // ---------------- HALLS ----------------
     
-    const hallData = { name: "Hall 1", capacity: 120 };
+    const hallData = { name: "Hall 1", capacity: 120 , location: "First Floor"};
     const hallRes = await axios.post(`${API_BASE}/halls`, hallData, { headers: { Authorization: `Bearer ${TOKEN}` } });
     console.log("Hall created:", hallRes.data);
     const hallId = hallRes.data.hall.id;

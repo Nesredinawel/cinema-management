@@ -19,9 +19,9 @@ type Hall struct {
 func CreateHall(h *Hall) error {
 	err := DB.QueryRow(context.Background(),
 		`INSERT INTO halls (name, capacity, location, created_at, updated_at) 
-         VALUES ($1, $2, NOW(), NOW()) 
+		 VALUES ($1,$2,$3,NOW(),NOW())
          RETURNING id, created_at, updated_at`,
-		h.Name, h.Capacity).
+		h.Name, h.Capacity, h.Location).
 		Scan(&h.ID, &h.CreatedAt, &h.UpdatedAt)
 
 	if err != nil {
@@ -34,7 +34,7 @@ func CreateHall(h *Hall) error {
 // ---------------- Get All Halls ----------------
 func GetAllHalls() ([]*Hall, error) {
 	rows, err := DB.Query(context.Background(),
-		`SELECT id, name, capacity, created_at, location, updated_at 
+		`SELECT id, name, capacity, location, created_at, updated_at 
          FROM halls ORDER BY id ASC`)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func GetAllHalls() ([]*Hall, error) {
 func GetHallByID(id int) (*Hall, error) {
 	h := &Hall{}
 	err := DB.QueryRow(context.Background(),
-		`SELECT id, name, capacity, created_at,location updated_at 
+		`SELECT id, name, capacity, location, created_at, updated_at 
          FROM halls WHERE id = $1`, id).
 		Scan(&h.ID, &h.Name, &h.Capacity, &h.Location, &h.CreatedAt, &h.UpdatedAt)
 
