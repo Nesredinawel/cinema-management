@@ -3,6 +3,7 @@ package controllers
 import (
 	"cinema-scheduling/models"
 	"cinema-scheduling/utils"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -36,16 +37,31 @@ func AddMovie(c *gin.Context) {
 		}
 	}
 
-	// Parse genre_ids (comma-separated in form-data)
-	if genreStr := c.PostForm("genre_ids"); genreStr != "" {
-		for _, g := range strings.Split(genreStr, ",") {
-			if gid, err := strconv.Atoi(strings.TrimSpace(g)); err == nil {
-				genreIDs = append(genreIDs, gid)
+	// ---------------- Parse genre_ids ----------------
+	genreStr := c.PostForm("genre_ids")
+	if genreStr != "" {
+		// Try parsing as JSON array first
+		if err := json.Unmarshal([]byte(genreStr), &genreIDs); err != nil {
+			// Fallback: treat as comma-separated string
+			for _, g := range strings.Split(genreStr, ",") {
+				if gid, err := strconv.Atoi(strings.TrimSpace(g)); err == nil {
+					genreIDs = append(genreIDs, gid)
+				}
 			}
 		}
 	}
 
-	// Handle poster
+	// Fetch genre names
+	if len(genreIDs) > 0 {
+		names, err := models.GetGenreNamesByIDs(genreIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch genre names"})
+			return
+		}
+		movie.Genres = names
+	}
+
+	// ---------------- Handle poster ----------------
 	file, _ := c.FormFile("image_poster_url")
 	posterURL := c.PostForm("image_poster_url")
 
@@ -58,7 +74,7 @@ func AddMovie(c *gin.Context) {
 		movie.ImagePosterURL = savedPoster
 	}
 
-	// Convert to public URL only if relative path
+	// Convert to public URL if relative path
 	if movie.ImagePosterURL != nil {
 		pathStr := *movie.ImagePosterURL
 		if !strings.HasPrefix(pathStr, "http://") && !strings.HasPrefix(pathStr, "https://") {
@@ -67,8 +83,8 @@ func AddMovie(c *gin.Context) {
 		}
 	}
 
-	// Create movie with genres
-	if err := models.CreateMovie(&movie, genreIDs); err != nil {
+	// Create movie
+	if err := models.CreateMovie(&movie); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create movie"})
 		return
 	}
@@ -136,7 +152,6 @@ func UpdateMovie(c *gin.Context) {
 		return
 	}
 
-	// Fetch existing movie
 	existingMovie, err := models.GetMovieByID(movieID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch movie"})
@@ -147,7 +162,6 @@ func UpdateMovie(c *gin.Context) {
 		return
 	}
 
-	// Parse incoming JSON
 	var req struct {
 		Title          *string  `json:"title"`
 		Description    *string  `json:"description"`
@@ -162,7 +176,6 @@ func UpdateMovie(c *gin.Context) {
 		return
 	}
 
-	// Apply updates
 	if req.Title != nil {
 		existingMovie.Title = *req.Title
 	}
@@ -185,9 +198,17 @@ func UpdateMovie(c *gin.Context) {
 			existingMovie.ImagePosterURL = &publicURL
 		}
 	}
+	// Update genres
+	if len(req.GenreIDs) > 0 {
+		names, err := models.GetGenreNamesByIDs(req.GenreIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch genre names"})
+			return
+		}
+		existingMovie.Genres = names
+	}
 
-	// Save update with genres
-	if err := models.UpdateMovie(existingMovie, req.GenreIDs); err != nil {
+	if err := models.UpdateMovie(existingMovie); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update movie"})
 		return
 	}

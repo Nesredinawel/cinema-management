@@ -62,6 +62,33 @@ func GetGenreByID(id int) (*Genre, error) {
 	return g, nil
 }
 
+// ---------------- Get Genre Names By IDs ----------------
+func GetGenreNamesByIDs(ids []int) ([]string, error) {
+	if len(ids) == 0 {
+		return []string{}, nil
+	}
+
+	query := `SELECT name FROM genres WHERE id = ANY($1)`
+	rows, err := DB.Query(context.Background(), query, ids)
+	if err != nil {
+		log.Printf("❌ GetGenreNamesByIDs error: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			log.Printf("❌ Scan genre name error: %v", err)
+			return nil, err
+		}
+		names = append(names, name)
+	}
+
+	return names, nil
+}
+
 // ---------------- Update Genre ----------------
 func UpdateGenre(genre *Genre) error {
 	_, err := DB.Exec(context.Background(),

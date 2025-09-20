@@ -80,19 +80,20 @@ func UpdateGenre(c *gin.Context) {
 		return
 	}
 
-	var req map[string]interface{}
+	var req struct {
+		Name string `json:"name"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if name, ok := req["name"].(string); ok && name != "" {
-		existingGenre.Name = name
-	}
-
-	if err := models.UpdateGenre(existingGenre); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update genre"})
-		return
+	if req.Name != "" {
+		existingGenre.Name = req.Name
+		if err := models.UpdateGenre(existingGenre); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update genre"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Genre updated", "genre": existingGenre})

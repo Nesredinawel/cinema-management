@@ -4,19 +4,19 @@ const fs = require("fs");
 const path = require("path");
 
 const API_BASE = "http://localhost:8082/api/admin";
-const TOKEN ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTgzMjYxMzMsInJvbGUiOiJhZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJ1c2VyX2lkIjoyfQ.H7DyH3DMDyMdUHmgWLNNuvEqvIs14klMRUZE9IW-gMU"; // Replace with your JWT
+const TOKEN ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTgzNjU2MzMsInJvbGUiOiJhZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJ1c2VyX2lkIjoxfQ.uJlxad3hYK69xnxE-b3fNBTGh_9AIP1GDNOO4rB696s"; // Replace with your JWT
 
 async function main() {
   try {
     // ---------------- GENRES ----------------
     const genre1 = await axios.post(
       `${API_BASE}/genres`,
-      { name: "Sci3Fi" },
+      { name: "Sci-Fi" },
       { headers: { Authorization: `Bearer ${TOKEN}` } }
     );
     const genre2 = await axios.post(
       `${API_BASE}/genres`,
-      { name: "Thr3ller" },
+      { name: "Thriller" },
       { headers: { Authorization: `Bearer ${TOKEN}` } }
     );
 

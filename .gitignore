@@ -1,1 +1,3 @@
 docker-compose.yaml
+# Ignore any .env file anywhere in the project
+**/.env
