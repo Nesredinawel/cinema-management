@@ -1,9 +1,3 @@
-Got it 🚀 I’ll reformat your README so it’s **GitHub-friendly**, clear, and attractive with **sections, bold highlights, and copy-paste code blocks** for `.env` and `docker-compose.yaml`.
-
-Here’s the polished version:
-
----
-
 # 🚀 Cinema Auth & Scheduling - Docker Setup
 
 This project uses **Docker Compose** to spin up a full environment with:
