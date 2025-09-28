@@ -1,30 +1,23 @@
 package main
 
 import (
+	"cinema-scheduling/config"
 	"cinema-scheduling/models"
 	"cinema-scheduling/routes"
 	"context"
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
-	// ---------------- Build Postgres URL ----------------
-	pgURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_NAME"),
-	)
+	// ---------------- Load Config ----------------
+	cfg := config.LoadConfig()
 
 	// ---------------- Connect to Postgres ----------------
 	var err error
-	models.DB, err = pgxpool.New(context.Background(), pgURL)
+	models.DB, err = pgxpool.New(context.Background(), cfg.PostgresURL)
 	if err != nil {
 		log.Fatalf("❌ Failed to connect to database: %v", err)
 	}
@@ -32,15 +25,11 @@ func main() {
 
 	// ---------------- Setup HTTP routes ----------------
 	router := gin.Default()
-	routes.SetupRoutes(router)
+	routes.SetupRoutes(router, cfg)
 
 	// ---------------- Run Server ----------------
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8082" // different from auth-backend
-	}
-	log.Printf("🎬 Cinema Scheduling service running on port %s", port)
-	if err := router.Run(":" + port); err != nil {
+	log.Printf("🎬 Cinema Scheduling service running on port %s", cfg.Port)
+	if err := router.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("❌ Failed to start server: %v", err)
 	}
 }

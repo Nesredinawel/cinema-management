@@ -89,7 +89,18 @@ func AddMovie(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Movie created", "movie": movie})
+	// ✅ Generate token for the movie
+	token, err := utils.GenerateToken("movie", movie.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate movie token"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Movie created",
+		"movie":   movie,
+		"token":   token,
+	})
 }
 
 // ---------------- List Movies ----------------
@@ -100,6 +111,7 @@ func ListMovies(c *gin.Context) {
 		return
 	}
 
+	var result []gin.H
 	for _, m := range movies {
 		if m.ImagePosterURL != nil {
 			pathStr := *m.ImagePosterURL
@@ -108,9 +120,17 @@ func ListMovies(c *gin.Context) {
 				m.ImagePosterURL = &publicURL
 			}
 		}
+
+		// ✅ attach movie token
+		token, _ := utils.GenerateToken("movie", m.ID)
+
+		result = append(result, gin.H{
+			"movie": m,
+			"token": token,
+		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"movies": movies})
+	c.JSON(http.StatusOK, gin.H{"movies": result})
 }
 
 // ---------------- Get Movie by ID ----------------
@@ -140,7 +160,13 @@ func GetMovie(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"movie": movie})
+	// ✅ generate movie token
+	token, _ := utils.GenerateToken("movie", movie.ID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"movie": movie,
+		"token": token,
+	})
 }
 
 // ---------------- Update Movie ----------------
@@ -169,6 +195,7 @@ func UpdateMovie(c *gin.Context) {
 		ReleaseYear    *int     `json:"release_year"`
 		Rating         *float64 `json:"rating"`
 		ImagePosterURL *string  `json:"image_poster_url"`
+		TrailerURL     *string  `json:"trailer_url"`
 		GenreIDs       []int    `json:"genre_ids"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -176,6 +203,7 @@ func UpdateMovie(c *gin.Context) {
 		return
 	}
 
+	// Update fields if provided
 	if req.Title != nil {
 		existingMovie.Title = *req.Title
 	}
@@ -198,7 +226,11 @@ func UpdateMovie(c *gin.Context) {
 			existingMovie.ImagePosterURL = &publicURL
 		}
 	}
-	// Update genres
+	if req.TrailerURL != nil {
+		existingMovie.TrailerURL = req.TrailerURL
+	}
+
+	// Update genres if provided
 	if len(req.GenreIDs) > 0 {
 		names, err := models.GetGenreNamesByIDs(req.GenreIDs)
 		if err != nil {
@@ -208,12 +240,20 @@ func UpdateMovie(c *gin.Context) {
 		existingMovie.Genres = names
 	}
 
+	// Save updates
 	if err := models.UpdateMovie(existingMovie); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update movie"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Movie updated", "movie": existingMovie})
+	// ✅ regenerate token
+	token, _ := utils.GenerateToken("movie", existingMovie.ID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Movie updated",
+		"movie":   existingMovie,
+		"token":   token,
+	})
 }
 
 // ---------------- Delete Movie ----------------

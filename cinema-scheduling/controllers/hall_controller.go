@@ -2,13 +2,14 @@ package controllers
 
 import (
 	"cinema-scheduling/models"
+	"cinema-scheduling/utils"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Add Hall
+// ---------------- Add Hall ----------------
 func AddHall(c *gin.Context) {
 	var hall models.Hall
 	if err := c.ShouldBindJSON(&hall); err != nil {
@@ -21,20 +22,34 @@ func AddHall(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Hall created", "hall": hall})
+	// ✅ Generate token after creation
+	token, _ := utils.GenerateToken("hall", hall.ID)
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Hall created", "hall": hall, "token": token})
 }
 
-// List Halls
+// ---------------- List Halls ----------------
 func ListHalls(c *gin.Context) {
 	halls, err := models.GetAllHalls()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch halls"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"halls": halls})
+
+	var result []gin.H
+	for _, h := range halls {
+		// ✅ attach token for each hall
+		token, _ := utils.GenerateToken("hall", h.ID)
+		result = append(result, gin.H{
+			"hall":  h,
+			"token": token,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"halls": result})
 }
 
-// Get Hall by ID
+// ---------------- Get Hall by ID ----------------
 func GetHall(c *gin.Context) {
 	hallIDStr := c.Param("hall_id")
 	hallID, err := strconv.Atoi(hallIDStr)
@@ -48,16 +63,17 @@ func GetHall(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hall"})
 		return
 	}
-
 	if hall == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Hall not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"hall": hall})
+	// ✅ generate token
+	token, _ := utils.GenerateToken("hall", hall.ID)
+
+	c.JSON(http.StatusOK, gin.H{"hall": hall, "token": token})
 }
 
-// Update Hall
 // ---------------- Update Hall ----------------
 func UpdateHall(c *gin.Context) {
 	hallIDStr := c.Param("hall_id")
@@ -67,7 +83,6 @@ func UpdateHall(c *gin.Context) {
 		return
 	}
 
-	// Fetch existing hall from DB
 	existingHall, err := models.GetHallByID(hallID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hall"})
@@ -78,34 +93,38 @@ func UpdateHall(c *gin.Context) {
 		return
 	}
 
-	// Bind incoming JSON into a map
-	var req map[string]interface{}
+	var req struct {
+		Name     *string `json:"name"`
+		Capacity *int    `json:"capacity"`
+		Location *string `json:"location"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Update only fields provided
-	if name, ok := req["name"].(string); ok {
-		existingHall.Name = name
+	if req.Name != nil {
+		existingHall.Name = *req.Name
 	}
-	if capacity, ok := req["capacity"].(float64); ok { // JSON numbers are float64
-		existingHall.Capacity = int(capacity)
+	if req.Capacity != nil {
+		existingHall.Capacity = *req.Capacity
 	}
-	if location, ok := req["location"].(string); ok {
-		existingHall.Location = &location
+	if req.Location != nil {
+		existingHall.Location = req.Location
 	}
 
-	// Save updated hall
 	if err := models.UpdateHall(existingHall); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update hall"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Hall updated", "hall": existingHall})
+	// ✅ regenerate token
+	token, _ := utils.GenerateToken("hall", existingHall.ID)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Hall updated", "hall": existingHall, "token": token})
 }
 
-// Delete Hall
+// ---------------- Delete Hall ----------------
 func DeleteHall(c *gin.Context) {
 	hallIDStr := c.Param("hall_id")
 	hallID, err := strconv.Atoi(hallIDStr)
@@ -113,9 +132,11 @@ func DeleteHall(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid hall ID"})
 		return
 	}
+
 	if err := models.DeleteHall(hallID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete hall"})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Hall deleted"})
 }

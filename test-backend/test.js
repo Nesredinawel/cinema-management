@@ -1,84 +1,35 @@
 const axios = require("axios");
-const FormData = require("form-data");
-const fs = require("fs");
-const path = require("path");
 
 const API_BASE = "http://localhost:8082/api/admin";
-const TOKEN ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTgzNjU2MzMsInJvbGUiOiJhZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJ1c2VyX2lkIjoxfQ.uJlxad3hYK69xnxE-b3fNBTGh_9AIP1GDNOO4rB696s"; // Replace with your JWT
+const ADMIN_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTkwNzkxMzcsInJvbGUiOiJhZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJ1c2VyX2lkIjoxfQ.x7Bq-wZKGs6C9YwcaEeHpgZ4-fhD8VgbFWN-I-efdy4"; // replace with your admin token
+const SCHEDULE_ID = 3;      // schedule ID to fetch
+const SCHEDULE_SNACK_ID = 3; // specific snack ID within the schedule
 
 async function main() {
   try {
-    // ---------------- GENRES ----------------
-    const genre1 = await axios.post(
-      `${API_BASE}/genres`,
-      { name: "Sci-Fi" },
-      { headers: { Authorization: `Bearer ${TOKEN}` } }
+    // ---------------- GET SCHEDULE ----------------
+    const scheduleRes = await axios.get(
+      `${API_BASE}/schedules/${SCHEDULE_ID}`,
+      { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } }
     );
-    const genre2 = await axios.post(
-      `${API_BASE}/genres`,
-      { name: "Thriller" },
-      { headers: { Authorization: `Bearer ${TOKEN}` } }
+    console.log("🎬 Schedule details:", scheduleRes.data);
+
+    // ---------------- GET ALL SNACKS FOR SCHEDULE ----------------
+    const snacksRes = await axios.get(
+      `${API_BASE}/schedules/${SCHEDULE_ID}/snacks`,
+      { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } }
     );
+    console.log("🍿 All schedule snacks:", snacksRes.data.schedule_snacks);
 
-    console.log("Genres created:", genre1.data, genre2.data);
-    const genreIds = [genre1.data.genre.id, genre2.data.genre.id];
-
-    // ---------------- MOVIES ----------------
-    const movieForm = new FormData();
-    movieForm.append("title", "Inception");
-    movieForm.append(
-      "description",
-      "A mind-bending thriller about dreams within dreams."
+    // ---------------- GET SPECIFIC SCHEDULE SNACK ----------------
+    const singleSnackRes = await axios.get(
+      `${API_BASE}/schedules/${SCHEDULE_ID}/snacks/${SCHEDULE_SNACK_ID}`,
+      { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } }
     );
-    movieForm.append("duration", 148);
-    movieForm.append("release_year", 2010);
-    movieForm.append("rating", 8.8);
-    movieForm.append(
-      "image_poster_url",
-      fs.createReadStream(path.join("C:/Users/nesre/Downloads", "inception.jpg"))
-    );
+    console.log("🥨 Specific schedule snack:", singleSnackRes.data);
 
-    // 👇 Send genre IDs as JSON
-    movieForm.append("genre_ids", JSON.stringify(genreIds));
-
-    const movieRes = await axios.post(`${API_BASE}/movies`, movieForm, {
-      headers: { Authorization: `Bearer ${TOKEN}`, ...movieForm.getHeaders() },
-    });
-    console.log("Movie created:", movieRes.data);
-    const movieId = movieRes.data.movie.id;
-
-    // ---------------- HALLS ----------------
-    const hallData = { name: "Hall 1", capacity: 120, location: "First Floor" };
-    const hallRes = await axios.post(`${API_BASE}/halls`, hallData, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-    });
-    console.log("Hall created:", hallRes.data);
-    const hallId = hallRes.data.hall.id;
-
-    // ---------------- SCHEDULES ----------------
-    const scheduleData = {
-      movie_id: movieId,
-      hall_id: hallId,
-      show_time: new Date().toISOString(),
-      available_seats: 120,
-    };
-
-    const scheduleRes = await axios.post(`${API_BASE}/schedules`, scheduleData, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-    });
-    console.log("Schedule created:", scheduleRes.data);
-    const scheduleId = scheduleRes.data.schedule.id;
-
-    // Get all schedules
-    const schedules = await axios.get(`${API_BASE}/schedules`, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-    });
-    console.log("All schedules:", schedules.data);
-  } catch (error) {
-    console.error(
-      "Error:",
-      error.response ? error.response.data : error.message
-    );
+  } catch (err) {
+    console.error("❌ Error:", err.response?.data || err.message);
   }
 }
 

@@ -2,20 +2,25 @@ package controllers
 
 import (
 	"cinema-scheduling/models"
+	"cinema-scheduling/utils"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 )
 
 // ---------------- Add Schedule ----------------
 func AddSchedule(c *gin.Context) {
 	var req struct {
-		MovieID        int    `json:"movie_id" binding:"required"`
-		HallID         int    `json:"hall_id" binding:"required"`
-		ShowTime       string `json:"show_time" binding:"required"` // ISO format (RFC3339)
-		AvailableSeats int    `json:"available_seats" binding:"required"`
+		MovieID        int     `json:"movie_id" binding:"required"`
+		MovieToken     string  `json:"movie_token" binding:"required"` // ✅ require movie token
+		HallID         int     `json:"hall_id" binding:"required"`
+		HallToken      string  `json:"hall_token" binding:"required"` // ✅ require hall token
+		ShowTime       string  `json:"show_time" binding:"required"`
+		AvailableSeats int     `json:"available_seats" binding:"required"`
+		Price          float64 `json:"price" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -23,6 +28,21 @@ func AddSchedule(c *gin.Context) {
 		return
 	}
 
+	// ✅ Verify movie token
+	movieEntity, movieID, err := utils.VerifyToken(req.MovieToken)
+	if err != nil || movieEntity != "movie" || movieID != req.MovieID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or mismatched movie token"})
+		return
+	}
+
+	// ✅ Verify hall token
+	hallEntity, hallID, err := utils.VerifyToken(req.HallToken)
+	if err != nil || hallEntity != "hall" || hallID != req.HallID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or mismatched hall token"})
+		return
+	}
+
+	// Parse show_time
 	showTime, err := time.Parse(time.RFC3339, req.ShowTime)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid show_time format. Use RFC3339 (e.g. 2025-09-19T15:04:05Z)"})
@@ -34,6 +54,7 @@ func AddSchedule(c *gin.Context) {
 		HallID:         req.HallID,
 		ShowTime:       showTime,
 		AvailableSeats: req.AvailableSeats,
+		Price:          req.Price,
 	}
 
 	if err := models.CreateSchedule(&schedule); err != nil {
@@ -41,7 +62,18 @@ func AddSchedule(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Schedule created", "schedule": schedule})
+	// ✅ Generate schedule token
+	token, err := utils.GenerateToken("schedule", schedule.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate schedule token"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":  "Schedule created",
+		"schedule": schedule,
+		"token":    token,
+	})
 }
 
 // ---------------- List Schedules ----------------
@@ -52,7 +84,16 @@ func ListSchedules(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"schedules": schedules})
+	var result []gin.H
+	for _, s := range schedules {
+		token, _ := utils.GenerateToken("schedule", s.ID)
+		result = append(result, gin.H{
+			"schedule": s,
+			"token":    token,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"schedules": result})
 }
 
 // ---------------- Get Schedule by ID ----------------
@@ -66,16 +107,20 @@ func GetSchedule(c *gin.Context) {
 
 	schedule, err := models.GetScheduleByID(scheduleID)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Schedule not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule"})
 		return
 	}
 
-	if schedule == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Schedule not found"})
-		return
-	}
+	token, _ := utils.GenerateToken("schedule", schedule.ID)
 
-	c.JSON(http.StatusOK, gin.H{"schedule": schedule})
+	c.JSON(http.StatusOK, gin.H{
+		"schedule": schedule,
+		"token":    token,
+	})
 }
 
 // ---------------- Update Schedule ----------------
@@ -87,7 +132,6 @@ func UpdateSchedule(c *gin.Context) {
 		return
 	}
 
-	// Fetch existing schedule from DB
 	existingSchedule, err := models.GetScheduleByID(scheduleID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule"})
@@ -98,15 +142,13 @@ func UpdateSchedule(c *gin.Context) {
 		return
 	}
 
-	// Bind incoming JSON into a map
 	var req map[string]interface{}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Update only provided fields
-	if movieID, ok := req["movie_id"].(float64); ok { // JSON numbers are float64
+	if movieID, ok := req["movie_id"].(float64); ok {
 		existingSchedule.MovieID = int(movieID)
 	}
 	if hallID, ok := req["hall_id"].(float64); ok {
@@ -123,14 +165,22 @@ func UpdateSchedule(c *gin.Context) {
 	if availableSeats, ok := req["available_seats"].(float64); ok {
 		existingSchedule.AvailableSeats = int(availableSeats)
 	}
+	if price, ok := req["price"].(float64); ok {
+		existingSchedule.Price = price
+	}
 
-	// Save updated schedule
 	if err := models.UpdateSchedule(existingSchedule); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update schedule"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Schedule updated", "schedule": existingSchedule})
+	token, _ := utils.GenerateToken("schedule", existingSchedule.ID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Schedule updated",
+		"schedule": existingSchedule,
+		"token":    token,
+	})
 }
 
 // ---------------- Delete Schedule ----------------

@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS movies (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
+    trailer_url TEXT ,
+    genres TEXT[], -- Array of genre names
     duration INT NOT NULL,
     release_year INT NOT NULL,
     rating NUMERIC(3,1),
@@ -113,16 +115,7 @@ CREATE TABLE IF NOT EXISTS movies (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- ==============================
--- Table: movie_genres (many-to-many)
--- ==============================
-CREATE TABLE IF NOT EXISTS movie_genres (
-    movie_id INT NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
-    genre_id INT NOT NULL REFERENCES genres(id) ON DELETE CASCADE,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (movie_id, genre_id)
-);
+
 
 -- ==============================
 -- Table: schedules
@@ -162,4 +155,48 @@ CREATE TABLE IF NOT EXISTS schedule_snacks (
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
     UNIQUE (schedule_id, snack_id)
+);
+
+
+-- Switch to booking DB
+CREATE DATABASE cinema_booking;
+\c cinema_booking;
+
+-- ==============================
+-- Table: bookings
+-- ==============================
+CREATE TABLE IF NOT EXISTS bookings (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,               -- from cinema_auth.users
+    schedule_id INT NOT NULL,           -- from cinema_scheduling.schedules
+    total_amount NUMERIC(10,2) NOT NULL,
+    status VARCHAR(50) DEFAULT 'PENDING', -- "PENDING", "CONFIRMED", "CANCELLED", "PAID"
+    payment_reference TEXT,              -- transaction id from Chapa or other gateway
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ==============================
+-- Table: booking_seats
+-- ==============================
+CREATE TABLE IF NOT EXISTS booking_seats (
+    id SERIAL PRIMARY KEY,
+    booking_id INT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    seat_number VARCHAR(10) NOT NULL,
+    is_available BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ==============================
+-- Table: booking_snacks
+-- ==============================
+CREATE TABLE IF NOT EXISTS booking_snacks (
+    id SERIAL PRIMARY KEY,
+    booking_id INT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    schedule_snack_id INT NOT NULL,   -- ✅ from cinema_scheduling.schedule_snacks
+    quantity INT NOT NULL DEFAULT 1,
+    price NUMERIC(10,2) NOT NULL,     -- copied from schedule_snacks/snacks at booking time
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );

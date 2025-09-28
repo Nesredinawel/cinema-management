@@ -21,8 +21,7 @@ func AddSnack(c *gin.Context) {
 
 	priceStr := c.PostForm("price")
 	if priceStr != "" {
-		price, err := strconv.ParseFloat(priceStr, 64)
-		if err == nil {
+		if price, err := strconv.ParseFloat(priceStr, 64); err == nil {
 			snack.Price = price
 		}
 	}
@@ -47,7 +46,10 @@ func AddSnack(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Snack created", "snack": snack})
+	// ✅ Generate token
+	token, _ := utils.GenerateToken("snack", snack.ID)
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Snack created", "snack": snack, "token": token})
 }
 
 // ---------------- List Snacks ----------------
@@ -58,11 +60,19 @@ func ListSnacks(c *gin.Context) {
 		return
 	}
 
+	var result []gin.H
 	for _, s := range snacks {
 		s.SnackImageURL = utils.ConvertSnackImageToPublicURL(s.SnackImageURL, "http://localhost:8082/")
+
+		// ✅ attach token
+		token, _ := utils.GenerateToken("snack", s.ID)
+		result = append(result, gin.H{
+			"snack": s,
+			"token": token,
+		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"snacks": snacks})
+	c.JSON(http.StatusOK, gin.H{"snacks": result})
 }
 
 // ---------------- Get Snack by ID ----------------
@@ -86,7 +96,10 @@ func GetSnack(c *gin.Context) {
 
 	snack.SnackImageURL = utils.ConvertSnackImageToPublicURL(snack.SnackImageURL, "http://localhost:8082/")
 
-	c.JSON(http.StatusOK, gin.H{"snack": snack})
+	// ✅ generate token
+	token, _ := utils.GenerateToken("snack", snack.ID)
+
+	c.JSON(http.StatusOK, gin.H{"snack": snack, "token": token})
 }
 
 // ---------------- Update Snack ----------------
@@ -98,7 +111,6 @@ func UpdateSnack(c *gin.Context) {
 		return
 	}
 
-	// Fetch existing snack from DB
 	existingSnack, err := models.GetSnackByID(snackID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch snack"})
@@ -109,43 +121,47 @@ func UpdateSnack(c *gin.Context) {
 		return
 	}
 
-	// Bind incoming JSON into a map
-	var req map[string]interface{}
+	var req struct {
+		Name          *string  `json:"name"`
+		Description   *string  `json:"description"`
+		Category      *string  `json:"category"`
+		Price         *float64 `json:"price"`
+		SnackImageURL *string  `json:"snack_image_url"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Update only fields provided
-	if name, ok := req["name"].(string); ok {
-		existingSnack.Name = name
+	if req.Name != nil {
+		existingSnack.Name = *req.Name
 	}
-	if desc, ok := req["description"].(string); ok {
-		existingSnack.Description = utils.StrPtr(desc)
+	if req.Description != nil {
+		existingSnack.Description = req.Description
 	}
-	if cat, ok := req["category"].(string); ok {
-		existingSnack.Category = utils.StrPtr(cat)
+	if req.Category != nil {
+		existingSnack.Category = req.Category
 	}
-	if price, ok := req["price"].(float64); ok {
-		existingSnack.Price = price
+	if req.Price != nil {
+		existingSnack.Price = *req.Price
 	}
-	if poster, ok := req["image_poster_url"].(string); ok {
-		existingSnack.SnackImageURL = &poster
-
-		// convert to public URL if needed
-		if !strings.HasPrefix(poster, "http://") && !strings.HasPrefix(poster, "https://") {
-			publicURL := utils.ConvertPosterToPublicURL(existingSnack.SnackImageURL, "http://localhost:8082/")
+	if req.SnackImageURL != nil {
+		existingSnack.SnackImageURL = req.SnackImageURL
+		if !strings.HasPrefix(*req.SnackImageURL, "http://") && !strings.HasPrefix(*req.SnackImageURL, "https://") {
+			publicURL := utils.ConvertPosterToPublicURL(req.SnackImageURL, "http://localhost:8082/")
 			existingSnack.SnackImageURL = &publicURL
 		}
 	}
 
-	// Save updated snack
 	if err := models.UpdateSnack(existingSnack); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update snack"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Snack updated", "snack": existingSnack})
+	// ✅ regenerate token
+	token, _ := utils.GenerateToken("snack", existingSnack.ID)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Snack updated", "snack": existingSnack, "token": token})
 }
 
 // ---------------- Delete Snack ----------------

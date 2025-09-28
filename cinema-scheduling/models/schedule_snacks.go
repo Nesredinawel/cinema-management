@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type ScheduleSnack struct {
@@ -64,6 +66,23 @@ func GetScheduleSnackByID(id int) (*ScheduleSnack, error) {
 		return nil, err
 	}
 
+	return ss, nil
+}
+
+func GetScheduleSnackByScheduleAndSnack(scheduleID int, snackID int) (*ScheduleSnack, error) {
+	row := DB.QueryRow(context.Background(),
+		"SELECT id, schedule_id, snack_id, available, created_at, updated_at FROM schedule_snacks WHERE schedule_id=$1 AND snack_id=$2",
+		scheduleID, snackID,
+	)
+
+	ss := &ScheduleSnack{}
+	err := row.Scan(&ss.ID, &ss.ScheduleID, &ss.SnackID, &ss.Available, &ss.CreatedAt, &ss.UpdatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
 	return ss, nil
 }
 

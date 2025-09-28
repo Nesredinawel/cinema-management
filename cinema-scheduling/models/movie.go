@@ -16,6 +16,7 @@ type Movie struct {
 	ReleaseYear    int       `json:"release_year"`
 	Rating         *float64  `json:"rating"`           // nullable
 	ImagePosterURL *string   `json:"image_poster_url"` // nullable
+	TrailerURL     *string   `json:"trailer_url"`      // nullable
 	Genres         []string  `json:"genres"`           // array of genre names
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
@@ -26,10 +27,10 @@ var DB *pgxpool.Pool
 // ---------------- Create Movie ----------------
 func CreateMovie(movie *Movie) error {
 	err := DB.QueryRow(context.Background(),
-		`INSERT INTO movies (title, description, duration, release_year, rating, image_poster_url, genres, created_at, updated_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW()) RETURNING id`,
+		`INSERT INTO movies (title, description, duration, release_year, rating, image_poster_url, trailer_url, genres, created_at, updated_at)
+	 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),NOW()) RETURNING id`,
 		movie.Title, movie.Description, movie.Duration, movie.ReleaseYear,
-		movie.Rating, movie.ImagePosterURL, movie.Genres,
+		movie.Rating, movie.ImagePosterURL, movie.TrailerURL, movie.Genres,
 	).Scan(&movie.ID)
 
 	if err != nil {
@@ -42,8 +43,9 @@ func CreateMovie(movie *Movie) error {
 // ---------------- List Movies ----------------
 func GetAllMovies() ([]*Movie, error) {
 	rows, err := DB.Query(context.Background(),
-		`SELECT id, title, description, duration, release_year, rating, image_poster_url, genres, created_at, updated_at
-		 FROM movies ORDER BY created_at DESC`)
+		`SELECT id, title, description, duration, release_year, rating, image_poster_url, trailer_url, genres, created_at, updated_at
+	 FROM movies ORDER BY created_at DESC`)
+
 	if err != nil {
 		return nil, err
 	}
@@ -72,12 +74,13 @@ func GetMovieByID(id int) (*Movie, error) {
 	var rating *float64
 
 	err := DB.QueryRow(context.Background(),
-		`SELECT id, title, description, duration, release_year, rating, image_poster_url, genres, created_at, updated_at
-		 FROM movies WHERE id=$1`, id,
+		`SELECT id, title, description, duration, release_year, rating, image_poster_url, trailer_url, genres, created_at, updated_at
+	 FROM movies WHERE id=$1`, id,
 	).Scan(
 		&m.ID, &m.Title, &m.Description, &m.Duration, &m.ReleaseYear,
-		&rating, &m.ImagePosterURL, &m.Genres, &m.CreatedAt, &m.UpdatedAt,
+		&rating, &m.ImagePosterURL, &m.TrailerURL, &m.Genres, &m.CreatedAt, &m.UpdatedAt,
 	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -89,11 +92,12 @@ func GetMovieByID(id int) (*Movie, error) {
 func UpdateMovie(movie *Movie) error {
 	_, err := DB.Exec(context.Background(),
 		`UPDATE movies 
-		 SET title=$1, description=$2, duration=$3, release_year=$4, rating=$5, image_poster_url=$6, genres=$7, updated_at=NOW() 
-		 WHERE id=$8`,
+	 SET title=$1, description=$2, duration=$3, release_year=$4, rating=$5, image_poster_url=$6, trailer_url=$7, genres=$8, updated_at=NOW() 
+	 WHERE id=$9`,
 		movie.Title, movie.Description, movie.Duration, movie.ReleaseYear,
-		movie.Rating, movie.ImagePosterURL, movie.Genres, movie.ID,
+		movie.Rating, movie.ImagePosterURL, movie.TrailerURL, movie.Genres, movie.ID,
 	)
+
 	if err != nil {
 		log.Printf("❌ UpdateMovie error: %v", err)
 		return err

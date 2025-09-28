@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
+
+	"auth-backend/config"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -13,21 +14,12 @@ import (
 var ctx = context.Background()
 var rdb *redis.Client
 
-// Init initializes Redis client and verifies connection
-func Init() error {
-	host := os.Getenv("REDIS_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	port := os.Getenv("REDIS_PORT")
-	if port == "" {
-		port = "6379"
-	}
-
-	addr := fmt.Sprintf("%s:%s", host, port)
+// Init initializes Redis client using values from Config
+func Init(cfg *config.Config) error {
+	addr := fmt.Sprintf("%s:%s", cfg.RedisHost, cfg.RedisPort)
 	rdb = redis.NewClient(&redis.Options{
 		Addr:     addr,
-		Password: os.Getenv("REDIS_PASSWORD"), // optional
+		Password: cfg.RedisPassword, // optional
 		DB:       0,
 	})
 
@@ -43,7 +35,7 @@ func Init() error {
 // ensureClient prevents nil pointer panic
 func ensureClient() bool {
 	if rdb == nil {
-		log.Println("⚠️ Redis client is nil. Did you call cache.Init() in main.go?")
+		log.Println("⚠️ Redis client is nil. Did you call cache.Init(cfg) in main.go?")
 		return false
 	}
 	return true

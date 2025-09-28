@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -16,6 +17,7 @@ type Config struct {
 	DBName         string
 	JWTSecret      string
 	JWTExpiryHours int
+	PostgresURL    string
 }
 
 func LoadConfig() *Config {
@@ -26,10 +28,10 @@ func LoadConfig() *Config {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8082"
+		port = "8082" // default port if not set
 	}
 
-	return &Config{
+	cfg := &Config{
 		Port:           port,
 		DBHost:         os.Getenv("DB_HOST"),
 		DBPort:         os.Getenv("DB_PORT"),
@@ -39,4 +41,15 @@ func LoadConfig() *Config {
 		JWTSecret:      os.Getenv("JWT_SECRET"),
 		JWTExpiryHours: 72,
 	}
+
+	// Build Postgres URL once and store it
+	cfg.PostgresURL = fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
+		cfg.DBUser,
+		cfg.DBPassword,
+		cfg.DBHost,
+		cfg.DBPort,
+		cfg.DBName,
+	)
+
+	return cfg
 }

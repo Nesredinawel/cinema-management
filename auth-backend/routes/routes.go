@@ -3,22 +3,23 @@ package routes
 import (
 	"auth-backend/controllers"
 	"auth-backend/middleware"
-	"auth-backend/models"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
+// SetupRoutes sets up all HTTP routes
 func SetupRoutes(router *gin.Engine) {
+	// ---------------- Public routes ----------------
 	public := router.Group("/api")
 	{
-		// Auth endpoints (public)
 		public.POST("/auth/email", controllers.EmailAuth)
-		public.POST("/auth/google", controllers.GoogleLogin)
+		public.POST("/auth/google", controllers.GoogleLogin) // reads GOOGLE_CLIENT_ID internally
 	}
 
+	// ---------------- Protected routes (JWT) ----------------
 	protected := router.Group("/api")
-	protected.Use(middleware.AuthMiddleware())
+	protected.Use(middleware.AuthMiddleware()) // reads JWT_SECRET internally
 	{
 		// User profile
 		protected.GET("/profile", func(c *gin.Context) {
@@ -28,12 +29,12 @@ func SetupRoutes(router *gin.Engine) {
 			c.JSON(http.StatusOK, gin.H{"user_id": userID, "role": role, "is_verified": isVerified})
 		})
 
-		// Phone OTP endpoints (JWT protected)
+		// Phone OTP endpoints
 		protected.POST("/auth/phone", controllers.PhoneAuth)
 		protected.POST("/auth/verify-otp", controllers.VerifyOTP)
 	}
 
-	// Admin routes
+	// ---------------- Admin routes ----------------
 	admin := router.Group("/api/admin")
 	admin.Use(middleware.AuthMiddleware(), middleware.RoleMiddleware("admin"))
 	{
@@ -41,48 +42,12 @@ func SetupRoutes(router *gin.Engine) {
 			c.JSON(http.StatusOK, gin.H{"message": "Admin dashboard"})
 		})
 
-		// Admin can create staff/admin/customer with extra details
-		admin.POST("/create-user", func(c *gin.Context) {
-			var body struct {
-				Name         string                 `json:"name" binding:"required"`
-				Email        *string                `json:"email"`
-				PhoneNumber  *string                `json:"phone_number"`
-				Password     string                 `json:"password" binding:"required"`
-				Role         string                 `json:"role" binding:"required"` // admin/staff/customer
-				ExtraDetails map[string]interface{} `json:"extra,omitempty"`         // level/dept/loyalty_points
-			}
-
-			if err := c.ShouldBindJSON(&body); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-
-			user := &models.User{
-				Name:         body.Name,
-				Email:        body.Email,
-				PhoneNumber:  body.PhoneNumber,
-				PasswordHash: body.Password, // assume hashed in controller
-				Role:         body.Role,
-				IsVerified:   false,
-			}
-
-			createdUser, _, err := models.CreateOrFetchUser(user, body.ExtraDetails)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			c.JSON(http.StatusOK, gin.H{"message": "User created successfully", "user": createdUser})
-		})
-
-		// Admin can upgrade staff → admin
+		admin.POST("/create-user", controllers.CreateUserByAdmin)
 		admin.POST("/change-role", controllers.ChangeUserRole)
-
-		// List all users
 		admin.GET("/users", controllers.ListUsers)
 	}
 
-	// Staff routes
+	// ---------------- Staff routes ----------------
 	staff := router.Group("/api/staff")
 	staff.Use(middleware.AuthMiddleware(), middleware.RoleMiddleware("staff"))
 	{
@@ -91,7 +56,7 @@ func SetupRoutes(router *gin.Engine) {
 		})
 	}
 
-	// Customer routes
+	// ---------------- Customer routes ----------------
 	customer := router.Group("/api/customer")
 	customer.Use(middleware.AuthMiddleware(), middleware.RoleMiddleware("customer"))
 	{
